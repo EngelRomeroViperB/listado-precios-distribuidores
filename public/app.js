@@ -553,10 +553,7 @@ async function generatePdf() {
     const res = await fetch('/api/generate-pdf', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        collections: state.collections,
-        selectedCollections,
-      }),
+      body: JSON.stringify({ selectedCollections }),
     });
 
     generatingMsg.style.display = 'none';
@@ -599,5 +596,20 @@ function escAttr(str) {
 /* ─── Init ───────────────────────────────────────────────────────────────── */
 (async function init() {
   await loadConfig();
+  // Restaurar colecciones en caché del servidor para que el PDF tab funcione
+  // sin necesidad de re-sincronizar después de recargar la página
+  if (state.config.collectionsCache && state.config.collectionsCache.length > 0) {
+    state.collections = state.config.collectionsCache;
+    renderCollections(state.collections);
+    renderMargins(state.collections);
+    updateHiddenBadge();
+    const dot = document.getElementById('statusDot');
+    const statusText = document.getElementById('syncStatusText');
+    if (dot) dot.className = 'status-dot synced';
+    if (statusText && state.config.lastSync) {
+      statusText.textContent = `Última sync: ${new Date(state.config.lastSync).toLocaleString('es-CO')}`;
+    }
+  }
+  refreshPdfTab();
   loadPdfHistory();
 })();

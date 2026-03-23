@@ -258,9 +258,10 @@ app.get('/api/sync', async (req, res) => {
       result.push(uncategorized);
     }
 
-    // Actualizar lastSync en config
+    // Actualizar lastSync y caché de colecciones en config
     const updatedConfig = readConfig();
     updatedConfig.lastSync = new Date().toISOString();
+    updatedConfig.collectionsCache = result; // ← caché persistente
     // Asegurar que todas las colecciones tengan margen definido
     for (const col of result) {
       if (updatedConfig.collectionMargins[col.id] === undefined) {
@@ -286,11 +287,14 @@ app.get('/api/sync', async (req, res) => {
 // ─── Generación de PDF ───────────────────────────────────────────────────────
 
 app.post('/api/generate-pdf', async (req, res) => {
-  const { collections, selectedCollections } = req.body;
+  const { selectedCollections } = req.body;
   const config = readConfig();
 
+  // Usar caché del servidor en lugar de datos enviados por el frontend
+  const collections = config.collectionsCache || [];
+
   if (!collections || collections.length === 0) {
-    return res.status(400).json({ ok: false, error: 'No hay datos de productos. Sincroniza primero.' });
+    return res.status(400).json({ ok: false, error: 'No hay datos de productos. Ve a la pestaña Productos y sincroniza primero.' });
   }
 
   try {
