@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    /*INJECT_DATA*/
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #1a56db;
+      --secondary: #6875f5;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11px;
+      color: #1f2937;
+      background: #fff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* ── Header (repetido en cada página) ── */
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background-color: var(--primary);
+      color: #fff;
+      position: running(pageHeader);
+    }
+    .header-logo {
+      height: 44px;
+      max-width: 140px;
+      object-fit: contain;
+    }
+    .header-logo-placeholder {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.02em;
+    }
+    .header-store-name {
+      font-size: 16px;
+      font-weight: 700;
+      text-align: center;
+      flex: 1;
+      padding: 0 24px;
+    }
+    .header-date {
+      font-size: 11px;
+      text-align: right;
+      opacity: .9;
+      white-space: nowrap;
+    }
+
+    /* ── Footer (repetido en cada página) ── */
+    .page-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 24px;
+      font-size: 10px;
+      color: #6b7280;
+      border-top: 1px solid #e5e7eb;
+      position: running(pageFooter);
+    }
+    .footer-message { flex: 1; }
+    .footer-page { text-align: right; white-space: nowrap; }
+
+    /* ── Contenido ── */
+    .content { padding: 0 24px 16px; }
+
+    /* ── Sección por colección ── */
+    .collection-section { margin-bottom: 24px; page-break-inside: avoid; }
+    .collection-title {
+      background-color: var(--primary);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 9px 14px;
+      border-radius: 4px 4px 0 0;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Tabla de productos ── */
+    .products-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #e5e7eb;
+      border-top: none;
+    }
+    .products-table th {
+      background: #f3f4f6;
+      padding: 7px 10px;
+      text-align: left;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #6b7280;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .products-table td {
+      padding: 7px 10px;
+      vertical-align: middle;
+      border-bottom: 1px solid #f3f4f6;
+      font-size: 11px;
+    }
+    .products-table tr:last-child td { border-bottom: none; }
+    .products-table tr:nth-child(odd) td { background: #fff; }
+    .products-table tr:nth-child(even) td { background: #f9fafb; }
+
+    /* Imagen */
+    .product-img {
+      width: 60px;
+      height: 60px;
+      object-fit: cover;
+      border-radius: 4px;
+      border: 1px solid #e5e7eb;
+      display: block;
+    }
+    .product-img-placeholder {
+      width: 60px;
+      height: 60px;
+      background: #f3f4f6;
+      border-radius: 4px;
+      border: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #d1d5db;
+    }
+
+    /* Celdas de precio */
+    .price-cell { font-weight: 500; white-space: nowrap; }
+    .price-no-cost {
+      background: #fde8e8;
+      color: #e02424;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 3px;
+      font-size: 10px;
+      display: inline-block;
+    }
+
+    .product-name { font-weight: 600; font-size: 11px; }
+    .variant-name { color: #6b7280; font-size: 10px; }
+
+    /* ── Print layout ── */
+    @page {
+      size: A4 landscape;
+      margin: 20mm 0 16mm 0;
+      @top-center { content: element(pageHeader); }
+      @bottom-center { content: element(pageFooter); width: 100%; }
+    }
+
+    .page-header-spacer { height: 72px; }
+    .page-footer-spacer { height: 32px; }
+  </style>
+</head>
+<body>
+  <!-- Header y footer para paged.js / Puppeteer -->
+  <div class="page-header" id="pdfHeader"></div>
+  <div class="page-footer" id="pdfFooter"></div>
+
+  <div class="page-header-spacer"></div>
+  <div class="content" id="pdfContent"></div>
+  <div class="page-footer-spacer"></div>
+
+  <script>
+    // PDF_DATA es inyectado por server.js antes de pasar a Puppeteer
+    // Esta línea es un fallback por si se abre directamente el archivo
+    if (typeof PDF_DATA === 'undefined') {
+      window.PDF_DATA = {
+        storeName: 'Mi Tienda',
+        logoUrl: '',
+        primaryColor: '#1a56db',
+        secondaryColor: '#6875f5',
+        currencySymbol: 'COP',
+        thousandSeparator: '.',
+        footerMessage: 'Precios válidos hasta el 30 de junio de 2025',
+        generatedDate: new Date().toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' }),
+        collections: [],
+      };
+    }
+
+    function formatPrice(value, sep) {
+      if (value == null || isNaN(value)) return '—';
+      const n = parseFloat(value);
+      if (sep === ',') return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      return n.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    (function render() {
+      const d = PDF_DATA;
+      const sep = d.thousandSeparator || '.';
+      const cur = d.currencySymbol || 'COP';
+
+      // Aplicar colores de marca como variables CSS
+      document.documentElement.style.setProperty('--primary', d.primaryColor || '#1a56db');
+      document.documentElement.style.setProperty('--secondary', d.secondaryColor || '#6875f5');
+
+      // ── Header ──
+      const header = document.getElementById('pdfHeader');
+      const logoHtml = d.logoUrl
+        ? `<img src="${d.logoUrl}" class="header-logo" alt="Logo" onerror="this.style.display='none'" />`
+        : `<div class="header-logo-placeholder">${escHtml(d.storeName)}</div>`;
+
+      header.innerHTML = `
+        ${logoHtml}
+        <div class="header-store-name">${escHtml(d.storeName)}</div>
+        <div class="header-date">Generado el ${escHtml(d.generatedDate)}</div>
+      `;
+
+      // ── Footer ──
+      const footer = document.getElementById('pdfFooter');
+      footer.innerHTML = `
+        <div class="footer-message">${escHtml(d.footerMessage)}</div>
+        <div class="footer-page">Página <span class="pageNumber"></span> de <span class="totalPages"></span></div>
+      `;
+
+      // ── Contenido por colección ──
+      const content = document.getElementById('pdfContent');
+      if (!d.collections || d.collections.length === 0) {
+        content.innerHTML = '<p style="padding:40px;text-align:center;color:#9ca3af;">No hay productos para mostrar.</p>';
+        return;
+      }
+
+      content.innerHTML = d.collections.map(col => {
+        const margin = parseFloat(col.margin || 0);
+        const rows = col.products.flatMap(product =>
+          product.variants.map((variant, vi) => {
+            const imgSrc = variant.image || product.image;
+            const imgHtml = imgSrc
+              ? `<img src="${escHtml(imgSrc)}" class="product-img" />`
+              : `<div class="product-img-placeholder">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <polyline points="21 15 16 10 5 21"/>
+                  </svg>
+                 </div>`;
+
+            const distPrice = (variant.cost != null && !isNaN(variant.cost))
+              ? variant.cost * (1 + margin / 100)
+              : null;
+            const distHtml = distPrice != null
+              ? `<span class="price-cell">${cur} ${formatPrice(distPrice, sep)}</span>`
+              : `<span class="price-no-cost">Sin costo</span>`;
+
+            return `
+              <tr>
+                <td style="width:72px;text-align:center;">${vi === 0 ? imgHtml : ''}</td>
+                <td>${vi === 0 ? `<span class="product-name">${escHtml(product.title)}</span>` : ''}</td>
+                <td class="variant-name">${product.variants.length > 1 ? escHtml(variant.title) : '—'}</td>
+                <td class="price-cell">${cur} ${formatPrice(variant.price, sep)}</td>
+                <td>${distHtml}</td>
+              </tr>`;
+          })
+        ).join('');
+
+        return `
+          <div class="collection-section">
+            <div class="collection-title">${escHtml(col.title)}</div>
+            <table class="products-table">
+              <thead>
+                <tr>
+                  <th style="width:72px"></th>
+                  <th>Producto</th>
+                  <th>Variante</th>
+                  <th>Precio web</th>
+                  <th>Precio distribuidor</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+      }).join('');
+    })();
+  </script>
+</body>
+</html>

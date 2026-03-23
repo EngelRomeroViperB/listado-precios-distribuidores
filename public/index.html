@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Listado de Precios — Distribuidores</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header-inner">
+      <div class="app-logo">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+        <span>Listado de Precios</span>
+      </div>
+      <div class="sync-status" id="syncStatus">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="syncStatusText">No sincronizado</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="config">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M16.24 7.76a6 6 0 0 1 0 8.49M4.93 4.93a10 10 0 0 0 0 14.14M7.76 7.76a6 6 0 0 0 0 8.49"/>
+      </svg>
+      Configuración
+    </button>
+    <button class="tab-btn" data-tab="products">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+      </svg>
+      Productos
+      <span class="badge" id="hiddenBadge" style="display:none"></span>
+    </button>
+    <button class="tab-btn" data-tab="pdf">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+      Generar PDF
+    </button>
+  </div>
+
+  <main class="main-content">
+
+    <!-- ═══════════════════════════════ PESTAÑA CONFIGURACIÓN ═══════════════════════════ -->
+    <section class="tab-panel active" id="tab-config">
+      <div class="section-card">
+        <h2 class="section-title">Credenciales de Shopify</h2>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="shopifyStore">Nombre de la tienda</label>
+            <input type="text" id="shopifyStore" placeholder="mitienda.myshopify.com" />
+            <span class="form-hint">Incluye .myshopify.com</span>
+          </div>
+          <div class="form-group">
+            <label for="shopifyToken">Admin API Access Token</label>
+            <input type="password" id="shopifyToken" placeholder="shpat_..." />
+            <span class="form-hint">Se guarda localmente, nunca se expone al cliente</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <h2 class="section-title">Marca y Apariencia</h2>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="logoUrl">URL del logo</label>
+            <input type="text" id="logoUrl" placeholder="https://ejemplo.com/logo.png" />
+          </div>
+          <div class="form-group form-group--colors">
+            <div>
+              <label for="primaryColor">Color primario</label>
+              <div class="color-input-row">
+                <input type="color" id="primaryColor" value="#1a56db" />
+                <input type="text" id="primaryColorText" placeholder="#1a56db" maxlength="7" />
+              </div>
+            </div>
+            <div>
+              <label for="secondaryColor">Color secundario</label>
+              <div class="color-input-row">
+                <input type="color" id="secondaryColor" value="#6875f5" />
+                <input type="text" id="secondaryColorText" placeholder="#6875f5" maxlength="7" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <h2 class="section-title">Formato y Moneda</h2>
+        <div class="form-grid form-grid--3">
+          <div class="form-group">
+            <label for="currencySymbol">Símbolo de moneda</label>
+            <input type="text" id="currencySymbol" placeholder="COP" maxlength="10" />
+          </div>
+          <div class="form-group">
+            <label for="thousandSeparator">Separador de miles</label>
+            <select id="thousandSeparator">
+              <option value=".">Punto ( 1.000.000 )</option>
+              <option value=",">Coma ( 1,000,000 )</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="footerMessage">Mensaje al pie del PDF</label>
+            <input type="text" id="footerMessage" placeholder="Precios válidos hasta el 30 de junio de 2025" />
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card" id="marginsCard">
+        <h2 class="section-title">
+          Márgenes por Colección
+          <span class="section-hint">Sincroniza para ver las colecciones</span>
+        </h2>
+        <div id="marginsContainer">
+          <div class="empty-state">
+            <p>Sincroniza los productos primero para configurar los márgenes por colección.</p>
+            <button class="btn btn--secondary" onclick="switchTab('products')">Ir a Productos →</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn--primary btn--lg" id="saveConfigBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+          </svg>
+          Guardar configuración
+        </button>
+        <div id="saveMsg" class="msg" style="display:none"></div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════ PESTAÑA PRODUCTOS ═══════════════════════════════ -->
+    <section class="tab-panel" id="tab-products">
+      <div class="products-toolbar">
+        <div class="search-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="text" id="searchInput" placeholder="Buscar productos..." />
+        </div>
+        <div class="toolbar-right">
+          <span id="productStats" class="product-stats"></span>
+          <button class="btn btn--primary" id="syncBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            Sincronizar productos
+          </button>
+        </div>
+      </div>
+
+      <div id="syncProgress" class="sync-progress" style="display:none">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <span id="progressText">Sincronizando...</span>
+      </div>
+
+      <div id="productsContainer">
+        <div class="empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+          </svg>
+          <p>No hay productos cargados.<br />Haz clic en <strong>Sincronizar productos</strong> para comenzar.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════ PESTAÑA GENERAR PDF ═════════════════════════════ -->
+    <section class="tab-panel" id="tab-pdf">
+      <div class="pdf-layout">
+        <div class="pdf-left">
+          <div class="section-card">
+            <h2 class="section-title">Seleccionar colecciones</h2>
+            <div id="pdfCollectionsContainer">
+              <div class="empty-state">
+                <p>Sincroniza los productos primero para seleccionar colecciones.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pdf-right">
+          <div class="section-card pdf-summary-card">
+            <h2 class="section-title">Resumen</h2>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <span class="summary-number" id="summaryCollections">0</span>
+                <span class="summary-label">colecciones</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-number" id="summaryProducts">0</span>
+                <span class="summary-label">productos</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-number" id="summaryVariants">0</span>
+                <span class="summary-label">variantes</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <button class="btn btn--primary btn--xl btn--full" id="generatePdfBtn" disabled>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="12" y1="18" x2="12" y2="12"/>
+                <line x1="9" y1="15" x2="15" y2="15"/>
+              </svg>
+              Generar y descargar PDF
+            </button>
+            <div id="pdfGeneratingMsg" class="generating-msg" style="display:none">
+              <div class="spinner"></div>
+              <span>Generando PDF, por favor espera...</span>
+            </div>
+            <div id="pdfResultMsg" class="msg" style="display:none"></div>
+          </div>
+
+          <div class="section-card">
+            <h2 class="section-title">Historial de PDFs</h2>
+            <div id="pdfHistoryContainer">
+              <p class="text-muted">No hay PDFs generados aún.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
