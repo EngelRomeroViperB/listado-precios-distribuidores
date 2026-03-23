@@ -169,58 +169,24 @@ app.get('/api/sync', async (req, res) => {
   const baseUrl = `https://${shopifyStore}`;
 
   try {
-    // 1. Traer productos
-    const products = await shopifyGetAll(`${baseUrl}/admin/api/2024-01/products.json`, shopifyToken, { limit: 250 });
+    // 1. Traer TODOS los productos (para costos y datos base)
+    const allProducts = await shopifyGetAll(`${baseUrl}/admin/api/2024-01/products.json`, shopifyToken, { limit: 250 });
 
-    // 2. Traer colecciones (custom + smart)
-    const [customCollections, smartCollections] = await Promise.all([
-      shopifyGetAll(`${baseUrl}/admin/api/2024-01/custom_collections.json`, shopifyToken, { limit: 250 }),
-      shopifyGetAll(`${baseUrl}/admin/api/2024-01/smart_collections.json`, shopifyToken, { limit: 250 }),
-    ]);
-    const allCollections = [...customCollections, ...smartCollections];
-
-    // 3. Traer collects para mapear productos a colecciones
-    const collects = await shopifyGetAll(`${baseUrl}/admin/api/2024-01/collects.json`, shopifyToken, { limit: 250 });
-
-    // Mapas de colecciones
-    const collectionMap = {};
-    for (const c of allCollections) {
-      collectionMap[c.id] = c;
-    }
-
-    // Mapa producto → colecciones
-    const productCollectionMap = {};
-    for (const c of collects) {
-      if (!productCollectionMap[c.product_id]) {
-        productCollectionMap[c.product_id] = [];
-      }
-      productCollectionMap[c.product_id].push(c.collection_id);
-    }
-
-    // 4. Recolectar todos los inventory_item_ids
+    // 2. Recolectar inventory_item_ids y obtener costos
     const allInventoryIds = [];
-    for (const product of products) {
+    for (const product of allProducts) {
       for (const variant of product.variants) {
         if (variant.inventory_item_id) {
           allInventoryIds.push(variant.inventory_item_id);
         }
       }
     }
-
-    // 5. Obtener costos
     const costMap = await getInventoryCosts(allInventoryIds, baseUrl, shopifyToken);
 
-    // 6. Armar estructura de datos
-    const collectionsWithProducts = {};
-    const uncategorized = {
-      id: 'uncategorized',
-      title: 'Sin colección',
-      products: [],
-    };
-
-    for (const product of products) {
-      const collectionIds = productCollectionMap[product.id] || [];
-      const enrichedProduct = {
+    // Mapa global de productos enriquecidos (id → producto)
+    const productMap = {};
+    for (const product of allProducts) {
+      productMap[product.id] = {
         id: product.id,
         title: product.title,
         image: product.image ? product.image.src : null,
@@ -235,28 +201,68 @@ app.get('/api/sync', async (req, res) => {
             : product.image?.src || null,
         })),
       };
+    }
 
-      if (collectionIds.length === 0) {
-        uncategorized.products.push(enrichedProduct);
-      } else {
-        for (const cId of collectionIds) {
-          if (!collectionsWithProducts[cId]) {
-            collectionsWithProducts[cId] = {
-              id: cId,
-              title: collectionMap[cId]?.title || `Colección ${cId}`,
-              products: [],
-            };
-          }
-          collectionsWithProducts[cId].products.push(enrichedProduct);
-        }
+    // 3. Traer colecciones (custom + smart)
+    const [customCollections, smartCollections] = await Promise.all([
+      shopifyGetAll(`${baseUrl}/admin/api/2024-01/custom_collections.json`, shopifyToken, { limit: 250 }),
+      shopifyGetAll(`${baseUrl}/admin/api/2024-01/smart_collections.json`, shopifyToken, { limit: 250 }),
+    ]);
+    const allCollections = [...customCollections, ...smartCollections];
+    console.log(`  → ${allCollections.length} colecciones encontradas (${customCollections.length} custom, ${smartCollections.length} smart)`);
+
+    // 4. Para cada colección, pedir sus productos con ?collection_id=X
+    //    Esto funciona tanto para custom como para smart collections.
+    //    Para evitar duplicados: un producto solo aparece en la primera
+    //    colección en que se encuentre.
+    const assignedProductIds = new Set();
+    const result = [];
+
+    for (const col of allCollections) {
+      await sleep(300); // respetar rate limit
+      const colProducts = await shopifyGetAll(
+        `${baseUrl}/admin/api/2024-01/products.json`,
+        shopifyToken,
+        { limit: 250, collection_id: col.id }
+      );
+
+      // Solo incluir productos no asignados aún
+      const uniqueProducts = colProducts
+        .filter((p) => !assignedProductIds.has(p.id))
+        .map((p) => {
+          assignedProductIds.add(p.id);
+          return productMap[p.id] || {
+            id: p.id,
+            title: p.title,
+            image: p.image ? p.image.src : null,
+            variants: [],
+          };
+        });
+
+      if (uniqueProducts.length > 0) {
+        result.push({
+          id: col.id,
+          title: col.title,
+          products: uniqueProducts,
+        });
       }
+      console.log(`  → Colección "${col.title}": ${uniqueProducts.length} productos únicos`);
     }
 
-    // Incluir sin categoría si tiene productos
-    const result = Object.values(collectionsWithProducts);
-    if (uncategorized.products.length > 0) {
-      result.push(uncategorized);
+    // 5. Productos sin ninguna colección
+    const uncategorizedProducts = allProducts
+      .filter((p) => !assignedProductIds.has(p.id))
+      .map((p) => productMap[p.id]);
+
+    if (uncategorizedProducts.length > 0) {
+      result.push({
+        id: 'uncategorized',
+        title: 'Sin colección',
+        products: uncategorizedProducts,
+      });
     }
+
+    console.log(`  → Total: ${result.length} colecciones, ${allProducts.length} productos`);
 
     // Actualizar lastSync y caché de colecciones en config
     const updatedConfig = readConfig();
@@ -273,8 +279,8 @@ app.get('/api/sync', async (req, res) => {
     res.json({
       ok: true,
       collections: result,
-      totalProducts: products.length,
-      totalVariants: products.reduce((sum, p) => sum + p.variants.length, 0),
+      totalProducts: allProducts.length,
+      totalVariants: allProducts.reduce((sum, p) => sum + p.variants.length, 0),
       lastSync: updatedConfig.lastSync,
     });
   } catch (err) {
