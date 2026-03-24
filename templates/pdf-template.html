@@ -3,8 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <style>
-    /*INJECT_DATA*/
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
@@ -172,6 +170,8 @@
   <div class="page-footer-spacer"></div>
 
   <script>
+    /*INJECT_DATA*/
+
     // PDF_DATA es inyectado por server.js antes de pasar a Puppeteer
     // Esta línea es un fallback por si se abre directamente el archivo
     if (typeof PDF_DATA === 'undefined') {
