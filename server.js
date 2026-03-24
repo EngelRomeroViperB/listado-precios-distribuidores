@@ -213,9 +213,7 @@ app.get('/api/sync', async (req, res) => {
 
     // 4. Para cada colección, pedir sus productos con ?collection_id=X
     //    Esto funciona tanto para custom como para smart collections.
-    //    Para evitar duplicados: un producto solo aparece en la primera
-    //    colección en que se encuentre.
-    const assignedProductIds = new Set();
+    const seenInAnyCollection = new Set();
     const result = [];
 
     for (const col of allCollections) {
@@ -226,11 +224,16 @@ app.get('/api/sync', async (req, res) => {
         { limit: 250, collection_id: col.id }
       );
 
-      // Solo incluir productos no asignados aún
-      const uniqueProducts = colProducts
-        .filter((p) => !assignedProductIds.has(p.id))
+      // Evitar duplicados solo dentro de la misma colección
+      const inCollection = new Set();
+      const collectionProducts = colProducts
+        .filter((p) => {
+          if (inCollection.has(p.id)) return false;
+          inCollection.add(p.id);
+          return true;
+        })
         .map((p) => {
-          assignedProductIds.add(p.id);
+          seenInAnyCollection.add(p.id);
           return productMap[p.id] || {
             id: p.id,
             title: p.title,
@@ -239,19 +242,19 @@ app.get('/api/sync', async (req, res) => {
           };
         });
 
-      if (uniqueProducts.length > 0) {
+      if (collectionProducts.length > 0) {
         result.push({
           id: col.id,
           title: col.title,
-          products: uniqueProducts,
+          products: collectionProducts,
         });
       }
-      console.log(`  → Colección "${col.title}": ${uniqueProducts.length} productos únicos`);
+      console.log(`  → Colección "${col.title}": ${collectionProducts.length} productos`);
     }
 
     // 5. Productos sin ninguna colección
     const uncategorizedProducts = allProducts
-      .filter((p) => !assignedProductIds.has(p.id))
+      .filter((p) => !seenInAnyCollection.has(p.id))
       .map((p) => productMap[p.id]);
 
     if (uncategorizedProducts.length > 0) {
@@ -326,6 +329,13 @@ app.post('/api/generate-pdf', async (req, res) => {
           .filter((p) => p.variants.length > 0),
       }))
       .filter((col) => col.products.length > 0);
+
+    if (filteredCollections.length === 0) {
+      return res.status(400).json({
+        ok: false,
+        error: 'No hay productos visibles para generar el PDF. Revisa colecciones seleccionadas y toggles de visibilidad en la pestaña Productos.',
+      });
+    }
 
     const pdfData = {
       storeName: config.shopifyStore ? config.shopifyStore.replace('.myshopify.com', '') : 'Mi Tienda',
