@@ -140,6 +140,6 @@ listado-precios/
 
 ---
 
-## Licencia
+## Licencia. no hay necesidad de desplegar 
 
 MIT
